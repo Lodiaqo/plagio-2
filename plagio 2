@@ -1,0 +1,205 @@
+import { useState, useEffect } from "react";
+
+function PlayerList({ players, scores, currentConductorIndex }) {
+  return (
+    <div className="w-full max-w-md mt-4">
+      <h3 className="text-lg font-semibold mb-2">Giocatori</h3>
+      <ul className="space-y-1">
+        {players.map((player, index) => (
+          <li
+            key={index}
+            className={`flex justify-between items-center px-3 py-2 rounded ${
+              index === currentConductorIndex ? "bg-yellow-100 font-bold" : "bg-white"
+            }`}
+          >
+            <span>
+              {index === currentConductorIndex && <span className="mr-1">👑</span>}
+              {player}
+            </span>
+            <span>{scores[player] || 0} pt</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default function Home() {
+  const [roomCode, setRoomCode] = useState("LADYSTARK");
+  const [isHost, setIsHost] = useState(false);
+  const [name, setName] = useState("");
+  const [joined, setJoined] = useState(false);
+  const [players, setPlayers] = useState([]);
+  const [scores, setScores] = useState({});
+  const [currentConductorIndex, setCurrentConductorIndex] = useState(0);
+  const [title, setTitle] = useState("");
+  const [publicPart, setPublicPart] = useState("");
+  const [hiddenPart, setHiddenPart] = useState("");
+  const [submittedAnswers, setSubmittedAnswers] = useState([]);
+  const [answersVisible, setAnswersVisible] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [shuffledAnswers, setShuffledAnswers] = useState([]);
+  const [votes, setVotes] = useState({});
+  const [statusMessage, setStatusMessage] = useState("");
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [cycleNumber, setCycleNumber] = useState(1);
+  const [resultsVisible, setResultsVisible] = useState(false);
+  const [promptConfirmed, setPromptConfirmed] = useState(false);
+
+  const createRoom = () => {
+    setIsHost(true);
+    setJoined(true);
+    setPlayers((prev) => [...prev, name]);
+    setScores((prev) => ({ ...prev, [name]: 0 }));
+  };
+
+  const joinRoom = () => {
+    if (roomCode.trim() && name.trim()) {
+      setJoined(true);
+      setPlayers((prev) => [...prev, name]);
+      setScores((prev) => ({ ...prev, [name]: 0 }));
+    }
+  };
+
+  const startGame = () => {
+    setStatusMessage(`Il gioco inizia! Il primo conduttore è: ${players[currentConductorIndex]}`);
+  };
+
+  const nextRound = () => {
+    const nextIndex = (currentConductorIndex + 1) % players.length;
+    setCurrentConductorIndex(nextIndex);
+    setTitle("");
+    setPublicPart("");
+    setHiddenPart("");
+    setSubmittedAnswers([]);
+    setAnswersVisible(false);
+    setSelectedAnswer(null);
+    setShuffledAnswers([]);
+    setVotes({});
+    setResultsVisible(false);
+    setPromptConfirmed(false);
+
+    if (nextIndex === 0) {
+      setCycleNumber((prev) => prev + 1);
+    }
+
+    setRoundNumber((prev) => prev + 1);
+    setStatusMessage(`Nuovo round! Il conduttore ora è: ${players[nextIndex]}`);
+  };
+
+  const updateScore = (player, delta) => {
+    setScores((prevScores) => ({
+      ...prevScores,
+      [player]: prevScores[player] + delta
+    }));
+  };
+
+  const submitAnswer = () => {
+    if (!selectedAnswer) return;
+    setSubmittedAnswers((prev) => [...prev, { player: name, answer: selectedAnswer }]);
+    setStatusMessage("Risposta inviata. In attesa degli altri giocatori...");
+  };
+
+  const revealAnswers = () => {
+    const allAnswers = [...submittedAnswers.map(a => a.answer), hiddenPart];
+    const shuffled = allAnswers.sort(() => 0.5 - Math.random());
+    setShuffledAnswers(shuffled);
+    setAnswersVisible(true);
+    setStatusMessage("Tutte le risposte sono ora visibili. Vota quella che pensi sia vera!");
+  };
+
+  const handleVote = (answer) => {
+    if (!answersVisible || votes[name]) return;
+    setVotes(prev => ({ ...prev, [name]: answer }));
+    setStatusMessage("Hai votato. In attesa degli altri...");
+  };
+
+  const allVotesIn = Object.keys(votes).length === players.length - 1;
+
+  useEffect(() => {
+    if (answersVisible && allVotesIn && !resultsVisible) {
+      calculatePoints();
+    }
+  }, [answersVisible, allVotesIn, resultsVisible]);
+
+  const calculatePoints = () => {
+    submittedAnswers.forEach(({ player, answer }) => {
+      const count = Object.values(votes).filter(v => v === answer).length;
+      if (count > 0) updateScore(player, 1);
+    });
+    submittedAnswers.forEach(({ player }) => {
+      if (votes[player] === hiddenPart) updateScore(player, 1);
+    });
+    setResultsVisible(true);
+    setStatusMessage("Punteggi aggiornati. Pronti per il prossimo round!");
+  };
+
+  const isCurrentConductor = players[currentConductorIndex] === name;
+  const allAnswersSubmitted = submittedAnswers.length === players.length - 1;
+
+  if (!joined) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center p-4">
+        <h1 className="text-4xl font-bold mb-6">Plagio 🔀</h1>
+
+        <input
+          type="text"
+          placeholder="Il tuo nome"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="border p-2 rounded mb-4 w-64"
+        />
+
+        <div className="flex gap-4 mt-2">
+          <button
+            onClick={createRoom}
+            className="bg-blue-500 text-white px-4 py-2 rounded"
+            disabled={!name}
+          >
+            Crea stanza
+          </button>
+          <div className="flex flex-col items-center">
+            <input
+              type="text"
+              placeholder="Codice stanza"
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              className="border p-2 rounded mb-2 w-32"
+              disabled
+            />
+            <button
+              onClick={joinRoom}
+              className="bg-green-500 text-white px-4 py-2 rounded"
+              disabled={!name}
+            >
+              Entra
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen flex flex-col items-center p-4 relative">
+      <div className="absolute top-2 right-4 bg-gray-100 border border-gray-300 rounded px-3 py-1 text-sm text-gray-800">
+        Round {roundNumber} del {cycleNumber}° giro
+      </div>
+
+      <h2 className="text-xl font-semibold mb-2">Benvenuto, {name}!</h2>
+      <p className="mb-4">
+        {isHost ? "Hai creato" : "Sei entrato in"} la stanza <strong>{roomCode}</strong>
+      </p>
+
+      {statusMessage && <p className="text-center text-sm text-gray-700 italic mb-2">{statusMessage}</p>}
+
+      <PlayerList
+        players={players}
+        scores={scores}
+        currentConductorIndex={currentConductorIndex}
+      />
+
+      {/* resto del componente invariato */}
+    </main>
+  );
+}
