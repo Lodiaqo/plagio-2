@@ -1,3 +1,13 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node"
+    }
+  ]
+}
+
 import { useState, useEffect } from "react";
 
 function PlayerList({ players, scores, currentConductorIndex }) {
